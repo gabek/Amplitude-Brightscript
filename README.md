@@ -1,7 +1,7 @@
-SegmentIO-Brightscript
+Amplitude-Brightscript
 ======================
 
-A [BrightScript](http://sdkdocs.roku.com/display/sdkdoc/BrightScript+Language+Reference) interface to [Segment.IO](https://segment.io/) event tracking
+A [BrightScript](http://sdkdocs.roku.com/display/sdkdoc/BrightScript+Language+Reference) interface to [Amplitude](https://amplitude.zendesk.com/hc/en-us/articles/204771828-HTTP-API) event tracking
 
 If you're in the market to add analytics to your Roku application this might be the solution for you.
 
@@ -14,18 +14,15 @@ If you're in the market to add analytics to your Roku application this might be 
 `User = createObject("roDeviceInfo").GetDeviceUniqueId()` is a great way to uniquely identify.
 3. Get access to the [message port](http://sdkdocs.roku.com/display/sdkdoc/roMessagePort) that's being used in your global event loop.
 4. And in your Session, or somewhere else that's persistant, create an instance of the Analytics object via the following:
-`Analytics = Analytics("UserIdentifier", "SegmentIOAPIKey", YourEventLoopPort)`
-
-The above will set up an initial "Identify" call to Segment.IO in order to start tracking this user.
-
+`Analytics = Analytics("UserIdentifier", "AmplitudeAPIKey", YourEventLoopPort)`
 
 ###**Example**
     MessagePort = GetGlobal().MessagePort
     User = createObject("roDeviceInfo").GetDeviceUniqueId()
     ApiKey = "ABCD1234"
-    
+
     Analytics = Analytics(User, ApiKey, MessagePort)
-    
+
     'My event loop
     while true
         msg = wait(0,MessagePort)
@@ -49,11 +46,11 @@ Utilizing your reference to the **Analytics** object you initialized above you c
 
 	details = CreateObject("roAssociativeArray")
 	details.buttonName = "Back"
-	
+
 	Analytics = GetSession().Analytics
 	Analytics.AddEvent("Button Pressed", details)
-	
+
 
 **Details**
 -----------
-All events (Including the initial **Identify** at initialization time are queued up and sent as batches to SegmentIO.  This is why the timer needs to be ping'ed during the event loop.  The events are sent to Segment.IO every 60 seconds as long as your event loop is still active.
+All events are queued up and sent as batches to Amplitude.  This is why the timer needs to be ping'ed during the event loop.  The events are sent every 60 seconds as long as your event loop is still active.
