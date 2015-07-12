@@ -1,4 +1,4 @@
-Function Analytics(userId as String, apikey as string, port as Object) as Object
+Function Analytics(device_id as String, apikey as string, port as Object) as Object
 	if GetGlobalAA().DoesExist("Analytics")
 		return GetGlobalAA().Analytics
 	else
@@ -6,7 +6,7 @@ Function Analytics(userId as String, apikey as string, port as Object) as Object
 		appInfo = CreateObject("roAppInfo")
 		this = {
 			type: "Analytics"
-			version: "1.0.3"
+			version: "1.0.0"
 
 			apikey: apikey
 
@@ -18,11 +18,9 @@ Function Analytics(userId as String, apikey as string, port as Object) as Object
 			HandleAnalyticsEvents: handle_analytics
 			GetGeoData: getGeoData_analytics
 
-			UserAgent: appInfo.GetTitle() + " - " + appInfo.GetVersion()
 			AppVersion: appInfo.GetVersion()
-			AppName: appInfo.GetTitle()
 
-			userId: userId
+			device_id: device_id
 			port: port
 
 			useGeoData: true
@@ -30,6 +28,9 @@ Function Analytics(userId as String, apikey as string, port as Object) as Object
 
 			queue: invalid
 			timer: invalid
+
+			session_id: AnalyticsDateTime()
+			event_id: 0
 
 			lastRequest: invalid
 		}
@@ -54,93 +55,66 @@ Function init_analytics() as void
 	m.timer = CreateObject("roTimeSpan")
 	m.timer.mark()
 
-	Identify = CreateObject("roAssociativeArray")
-	Identify.SetModeCaseSensitive()
-	Identify.action = "identify"
-	m.AddSessionDetails(Identify)
-
-	m.queue.push(Identify)
-
 	print "Anlytics Initialized..."
 
 End Function
 
 Function ViewScreen(screenName as String)
 	event = CreateObject("roAssociativeArray")
-	event.action = "screen"
-	event.name = screenName
+	event.event_type = "Screen View"
+	event.event_properties = CreateObject("roAssociativeArray")
+	event.event_properties.screen_name = screenName
 	m.AddSessionDetails(event)
 	m.queue.push(event)
 End Function
 
 Function add_analytics(eventName as string, properties = invalid as Object)
 	event = CreateObject("roAssociativeArray")
-	event.action = "track"
-	event.event = eventName
-	event.properties = properties
+	event.event_type = eventName
+	event.event_properties = properties
 	m.AddSessionDetails(event)
 	m.queue.push(event)
 End Function
 
 Function AddSessionDetails(event as Object)
-	event.timestamp = AnalyticsDateTime()
-	event.userId = m.userId
-	event.context = CreateObject("roAssociativeArray")
-
-	if NOT event.DoesExist("options")
-		options = CreateObject("roAssociativeArray")
-		event.options = options
-	end if
-
-	library = CreateObject("roAssociativeArray")
-	library.name = "SegmentIO-Brightscript"
-	library.version = m.version
-
-	event.options.library = library
+	m.event_id = m.event_id + 1
 
 	device = CreateObject("roDeviceInfo")
 
-	deviceInfo = CreateObject("roAssociativeArray")
-	deviceInfo.model = device.GetModel()
-	deviceInfo.version = device.GetVersion()
-	deviceInfo.manufacturer = "Roku"
-	deviceInfo.name = device.GetModelDisplayName()
-	deviceInfo.id = device.GetDeviceUniqueId()
-	event.context.device = deviceInfo
+	event.time = AnalyticsDateTime()
+	event.device_id = m.device_id
+	event.app_version = m.AppVersion
+	event.platform = "Roku"
+	event.session_id = m.session_id
+	event.event_id = m.event_id
 
-	event.context.app = CreateObject("roAssociativeArray")
-	event.context.app.name = m.AppName
-	event.context.app.version = m.AppVersion
-	event.context.useragent = m.useragent
+	event.device_model = device.GetModelDisplayName()
 
-	event.context.os = CreateObject("roAssociativeArray")
-	event.context.os.version = device.GetVersion()
-	event.context.os.name = "Roku"
+	event.os_name = device.GetVersion()
+	event.os_version = device.GetVersion()
+
+	event.language = device.GetCurrentLocale()
 
 	if m.geoData <> invalid
 		location = CreateObject("roAssociativeArray")
-		if m.geoData.DoesExist("country_code") then location.country = m.geoData.country_code
-		if m.geoData.DoesExist("city") then location.city = m.geoData.city
-		if m.geoData.DoesExist("longitude") then location.longitude = m.geoData.longitude
-		if m.geoData.DoesExist("latitude") then location.latitude = m.geoData.latitude
-		event.context.location = location
-
-		if m.geoData.DoesExist("ip") then event.context.ip = m.geoData.ip
+		if m.geoData.DoesExist("country_code") then event.country = m.geoData.country_code
+		if m.geoData.DoesExist("city") then event.city = m.geoData.city
+		if m.geoData.DoesExist("longitude") then event.location_lng = m.geoData.longitude
+		if m.geoData.DoesExist("latitude") then event.location_lat = m.geoData.latitude
+		if m.geoData.DoesExist("ip") then event.ip = m.geoData.ip
 	end if
 
-	event.context.ip = m.ipAddress
-	event.context.os = device.GetVersion()
-
-	locale = strReplace(device.GetCurrentLocale(), "_", "-")
-	event.context.locale = locale
-
+	event.user_properties = CreateObject("roAssociativeArray")
 	screen = CreateObject("roAssociativeArray")
 	screen.width = device.GetDisplaySize().w
 	screen.height = device.getDisplaySize().h
 	screen.type = device.GetDisplayType()
 	screen.mode = device.GetDisplayMode()
 	screen.ratio = device.GetDisplayAspectRatio()
-	event.context.screen = screen
+	event.user_properties.screen = screen
+
+	event.device_details = device.GetModelDetails()
+
 
 End Function
 
@@ -149,42 +123,21 @@ Function submit_analytics() as Void
 	if m.queue.count() > 0 THEN
 		print "Submitting Analytics..."
 
-		batch = CreateObject("roAssociativeArray")
-		batch.SetModeCaseSensitive()
-		batch.batch = m.queue
-
-		batch.context = CreateObject("roAssociativeArray")
-		batch.context.SetModeCaseSensitive()
-
-		library = CreateObject("roAssociativeArray")
-		library.name = "SegmentIO-Brightscript"
-		library.version = m.version
-		batch.context.library = library
-
-		json = strReplace(FormatJson(batch), "userid", "userId") 'Because of the wonky way roAssociativeArrays keys don't care about case :\
+		eventsJson = FormatJson(m.queue)
+		PostString = "api_key=" + m.apiKey + "&event=" + eventsJson
 
 		m.queue.clear()
 
 		transfer = CreateObject("roUrlTransfer")
-
-		'Authentication
-		Auth = CreateObject("roByteArray")
-		Auth.FromAsciiString(m.apikey + ":")
-
-		transfer.AddHeader("Authorization", "Basic " + Auth.ToBase64String())
-		transfer.AddHeader("Accept", "application/json")
-		transfer.AddHeader("Content-type", "application/json")
-
-		transfer.SetUrl("https://api.segment.io/v1/import")
+		transfer.SetUrl("https://api.amplitude.com/httpapi")
 		transfer.SetPort(m.port)
-
 		transfer.EnablePeerVerification(false)
 		transfer.EnableHostVerification(false)
 		transfer.RetainBodyOnError(true)
 
 		m.lastRequest = transfer
 
-		transfer.AsyncPostFromString(json)
+		transfer.AsyncPostFromString(PostString)
 
 	end if
 	m.timer.mark()
@@ -198,11 +151,10 @@ Function handle_analytics(msg)
 
 	if type(msg) = "roUrlEvent" AND m.lastRequest <> invalid AND m.lastRequest.GetIdentity() = msg.GetSourceIdentity()
 		responseString = msg.GetString()
-		response = ParseJSON(responseString)
 
 		'Check for errors
-		if response <> invalid AND NOT response.DoesExist("success")
-			Print "*** There was an error submitting Analytics to Segment.IO: " + responseString
+		if responseString <> "success"
+			Print "*** There was an error submitting Analytics to Amplitude: " + responseString
 		end if
 
 		m.lastRequest = invalid
@@ -210,10 +162,10 @@ Function handle_analytics(msg)
 
 End Function
 
-Function AnalyticsDateTime() as String
+Function AnalyticsDateTime() as Integer
 	date = CreateObject("roDateTime")
 	date.mark()
-	return DateToISO8601String(date, true)
+	return date.AsSeconds()
 End Function
 
 
@@ -227,31 +179,4 @@ Function getGeoData_analytics()
 
 	object = ParseJSON(data)
 	m.geoData = object
-End Function
-
-
-'From http://forums.roku.com/viewtopic.php?p=336966&sid=393c92b8708c0ba9f00c2650d60fbd69
-Function DateToISO8601String(date As Object, includeZ = True As Boolean) As String
-   iso8601 = PadLeft(date.GetYear().ToStr(), "0", 4)
-   iso8601 = iso8601 + "-"
-   iso8601 = iso8601 + PadLeft(date.GetMonth().ToStr(), "0", 2)
-   iso8601 = iso8601 + "-"
-   iso8601 = iso8601 + PadLeft(date.GetDayOfMonth().ToStr(), "0", 2)
-   iso8601 = iso8601 + "T"
-   iso8601 = iso8601 + PadLeft(date.GetHours().ToStr(), "0", 2)
-   iso8601 = iso8601 + ":"
-   iso8601 = iso8601 + PadLeft(date.GetMinutes().ToStr(), "0", 2)
-   iso8601 = iso8601 + ":"
-   iso8601 = iso8601 + PadLeft(date.GetSeconds().ToStr(), "0", 2)
-   If includeZ Then
-      iso8601 = iso8601 + "Z"
-   End If
-   Return iso8601
-End Function
-
-Function PadLeft(value As String, padChar As String, totalLength As Integer) As String
-   While value.Len() < totalLength
-      value = padChar + value
-   End While
-   Return value
 End Function
