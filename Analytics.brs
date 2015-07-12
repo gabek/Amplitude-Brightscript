@@ -80,6 +80,7 @@ Function AddSessionDetails(event as Object)
 	m.event_id = m.event_id + 1
 
 	device = CreateObject("roDeviceInfo")
+	device_details = device.GetModelDetails()
 
 	event.time = AnalyticsDateTime()
 	event.device_id = m.device_id
@@ -88,9 +89,10 @@ Function AddSessionDetails(event as Object)
 	event.session_id = m.session_id
 	event.event_id = m.event_id
 
-	event.device_model = device.GetModelDisplayName()
+	event.device_manufacturer = device_details.VendorName
+	event.device_model = device_details.ModelNumber
 
-	event.os_name = device.GetVersion()
+	event.os_name = "Roku"
 	event.os_version = device.GetVersion()
 
 	event.language = device.GetCurrentLocale()
@@ -112,9 +114,7 @@ Function AddSessionDetails(event as Object)
 	screen.mode = device.GetDisplayMode()
 	screen.ratio = device.GetDisplayAspectRatio()
 	event.user_properties.screen = screen
-
-	event.device_details = device.GetModelDetails()
-
+	event.user_properties.device = device.GetModelDisplayName()
 
 End Function
 
