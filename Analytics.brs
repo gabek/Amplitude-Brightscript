@@ -164,7 +164,7 @@ End Function
 
 Function AnalyticsDateTime() as Integer
 	date = CreateObject("roDateTime")
-	return date.AsSeconds() * 1000
+	return date.AsSeconds()
 End Function
 
 
