@@ -44,19 +44,20 @@ Function Analytics(device_id as String, apikey as string, port as Object) as Obj
 End Function
 
 Function init_analytics() as void
-	if m.useGeoData = true
+
+	'Use cached geo data if available'
+	geoDataJson = GetCachedGeoData()
+	if geoDataJson <> Invalid
+	 	m.geoData = ParseJSON(geoDataJson)
+	else if m.geoData = invalid AND m.useGeoData = true
 		m.GetGeoData()
 	end if
 
 	m.SetModeCaseSensitive()
-
 	m.queue = CreateObject("roArray", 0, true)
-
 	m.timer = CreateObject("roTimeSpan")
 	m.timer.mark()
-
 	print "Anlytics Initialized..."
-
 End Function
 
 Function ViewScreen(screenName as String)
@@ -175,7 +176,22 @@ Function getGeoData_analytics()
 	transfer = CreateObject("roUrlTransfer")
 	transfer.SetUrl(url)
 	data = transfer.GetToString()
+	saveCachedGeoData(data)
+	RegWrite("geoData", data, "analytics")
 
 	object = ParseJSON(data)
 	m.geoData = object
 End Function
+
+Function getCachedGeoData() as Dynamic
+	key = "geodata"
+	sec = CreateObject("roRegistrySection", "analytics")
+	if sec.Exists(key) then return sec.Read(key)
+	return invalid
+End Function
+
+Function saveCachedGeoData(data)
+	key = "geodata"
+	sec = CreateObject("roRegistrySection", "analytics")
+	sec.Write(key, data)
+End function
