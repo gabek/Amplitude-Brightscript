@@ -100,11 +100,11 @@ Function AddSessionDetails(event as Object)
 
 	if m.geoData <> invalid
 		location = CreateObject("roAssociativeArray")
-		if m.geoData.DoesExist("country_code") then event.country = m.geoData.country_code
+		if m.geoData.DoesExist("countryCode") then event.country = m.geoData.country_code
 		if m.geoData.DoesExist("city") then event.city = m.geoData.city
-		if m.geoData.DoesExist("longitude") then event.location_lng = m.geoData.longitude
-		if m.geoData.DoesExist("latitude") then event.location_lat = m.geoData.latitude
-		if m.geoData.DoesExist("ip") then event.ip = m.geoData.ip
+		if m.geoData.DoesExist("lon") then event.location_lng = m.geoData.longitude
+		if m.geoData.DoesExist("lat") then event.location_lat = m.geoData.latitude
+		if m.geoData.DoesExist("query") then event.ip = m.geoData.ip
 	end if
 
 	event.user_properties = CreateObject("roAssociativeArray")
@@ -171,10 +171,20 @@ End Function
 
 'This queries the telize open GeoIP service Telize to get Geo and public IP data
 Function getGeoData_analytics()
-	url = "http://www.telize.com/geoip"
-
 	transfer = CreateObject("roUrlTransfer")
+
+	publicIPApi = "https://api.ipify.org?format=json"
+	transfer.SetUrl(publicIPApi)
+	ipResult = transfer.GetToString()
+	ipObject = ParseJson(ipResult)
+
+	if ipObject = invalid OR ipObject.ip = invalid
+		return false
+	end if
+
+	url = "http://ip-api.com/json/" + ipObject.ip
 	transfer.SetUrl(url)
+
 	data = transfer.GetToString()
 	saveCachedGeoData(data)
 	RegWrite("geoData", data, "analytics")
